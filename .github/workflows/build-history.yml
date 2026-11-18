@@ -1,0 +1,45 @@
+name: Build crime history packs
+
+on:
+  workflow_dispatch:
+    inputs:
+      forces:
+        description: "Force slugs, comma-separated (blank = all forces). Example: north-wales"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build packs
+        env:
+          FORCES: ${{ github.event.inputs.forces }}
+          VERSION: history-${{ github.run_number }}
+          RELEASE_BASE: https://github.com/${{ github.repository }}/releases/download/history-${{ github.run_number }}
+        run: python build_packs.py
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=history-${{ github.run_number }}
+          gh release create "$TAG" out/* \
+            --title "Crime history $TAG" \
+            --notes "Historical street-level crime packs for Crime Near Me. Contains public sector information licensed under the Open Government Licence v3.0." \
+            --latest
